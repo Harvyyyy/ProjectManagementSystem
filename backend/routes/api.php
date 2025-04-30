@@ -5,42 +5,57 @@ use App\Http\Controllers\api\ProjectController;
 use App\Http\Controllers\api\TaskController;
 use App\Http\Controllers\api\AuthController;
 use App\Http\Controllers\api\UserController;
-use App\Http\Controllers\api\ExpenditureController; // Import new controller
+use App\Http\Controllers\api\ExpenditureController;
+use App\Http\Controllers\api\TimeEntryController; // <-- IMPORT TimeEntryController
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "api" middleware group. Make something great!
+|
+*/
+
+// Authenticated Routes (Require Sanctum Token)
 Route::middleware('auth:sanctum')->group(function () {
-    // Existing Project routes (no changes needed here for budget itself, handled in controller)
+
+    // === Project Routes ===
     Route::apiResource('projects', ProjectController::class);
 
-    // Nested routes for Expenditures under Projects
-    // GET /api/projects/{project}/expenditures - List expenditures for a project
-    // POST /api/projects/{project}/expenditures - Create expenditure for a project
-    // GET /api/projects/{project}/expenditures/{expenditure} - Show specific expenditure
-    // PUT/PATCH /api/projects/{project}/expenditures/{expenditure} - Update specific expenditure
-    // DELETE /api/projects/{project}/expenditures/{expenditure} - Delete specific expenditure
-    Route::apiResource('projects.expenditures', ExpenditureController::class)->shallow();
-    // ->shallow() makes routes for show, update, destroy not nested
-    // e.g., GET /api/expenditures/{expenditure} instead of /api/projects/{project}/expenditures/{expenditure}
-    // Choose based on preference. Keeping them nested (without shallow) is also fine.
+    // === Expenditure Routes (Nested under Projects initially) ===
+    // Note: If Task costs replace Expenditures entirely, these might be removed later.
+    Route::apiResource('projects.expenditures', ExpenditureController::class)
+         ->shallow(); // Keeps GET/POST nested, makes PUT/DELETE non-nested (e.g., /api/expenditures/{id})
 
+    // === Task Routes ===
+    Route::get('projects/{project}/tasks', [TaskController::class, 'projectTasks']); // List tasks for a specific project
+    Route::get('tasks/status/{status}', [TaskController::class, 'tasksByStatus']); // Filter tasks by status
+    Route::apiResource('tasks', TaskController::class); // Standard Task CRUD (index, show, store, update, destroy)
 
-    // Existing Task routes
-    Route::get('projects/{project}/tasks', [TaskController::class, 'projectTasks']); // List tasks for project
-    Route::apiResource('tasks', TaskController::class); // Standard task CRUD
-    Route::get('tasks/status/{status}', [TaskController::class, 'tasksByStatus']); // Filter tasks
+    // === NEW: Time Entry Routes (Nested under Tasks) ===
+    // Defines:
+    // GET    /api/tasks/{task}/time-entries      -> TimeEntryController@index (List entries for a task)
+    // POST   /api/tasks/{task}/time-entries      -> TimeEntryController@store (Create entry for a task)
+    Route::apiResource('tasks.time-entries', TimeEntryController::class)
+         ->only(['index', 'store']); // Only enabling list and create for now
+    // If you need update/delete later, consider adding shallow() or defining separate routes
+    // e.g., Route::apiResource('time-entries', TimeEntryController::class)->except(['index', 'store']);
 
-    // User routes
-    Route::get('/users', [UserController::class, 'index']); // List users (for assignment etc.)
+    // === User Routes ===
+    Route::get('/users', [UserController::class, 'index']); // List users (e.g., for task assignment dropdown)
 
-    // Auth routes
+    // === Auth Routes ===
     Route::post('/logout', [AuthController::class, 'logout']);
+
 });
 
-// Public routes (Login/Register)
+// Public Routes (No Authentication Required)
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// REMOVE these duplicate routes outside the auth middleware if they exist
-// Route::apiResource('projects', ProjectController::class);
-// Route::apiResource('tasks', TaskController::class);
+// Ensure no duplicate unauthenticated resource routes exist below

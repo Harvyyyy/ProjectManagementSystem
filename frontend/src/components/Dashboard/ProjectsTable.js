@@ -32,11 +32,11 @@ function ProjectsTable() {
   const [currentProject, setCurrentProject] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    name: '', description: '', start_date: '', end_date: '', status: 'Not Started', budget: '', currency: 'USD',
+    name: '', description: '', start_date: '', end_date: '', status: 'Not Started', budget: '', currency: 'PHP',
   });
 
   const projectStatuses = ['Not Started', 'In Progress', 'On Hold', 'Completed'];
-  const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD'];
+  const currencies = ['USD', 'EUR', 'PHP', 'JPY', 'CAD'];
 
   // Fetching logic (Backend now sends total_task_cost and updated remaining_budget)
   const fetchProjects = useCallback(async () => {

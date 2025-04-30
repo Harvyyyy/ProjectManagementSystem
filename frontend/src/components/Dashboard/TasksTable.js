@@ -3,8 +3,11 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../App';
 // Ensure Row and Col are imported
 import { Modal, Button, Form, Badge, Table, Spinner, Alert, Row, Col } from 'react-bootstrap';
-// Assuming formatCurrency is correctly imported
-import { formatCurrency } from '../../utils/formatting'; // Adjust path if needed
+// --- ADDED Import (if missing) ---
+import { formatCurrency, formatDuration } from '../../utils/formatting'; // Adjust path if needed. Make sure formatDuration exists.
+import TimeLogForm from './TimeLogForm'; // Assuming TimeLogForm.js is in the same directory
+// --- END Import ---
+
 
 // Helper functions (define outside or import)
 const getTaskStatusColor = (status) => {
@@ -51,6 +54,12 @@ function TaskTable() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- ADDED State for Time Log Modal ---
+  const [showTimeLogModal, setShowTimeLogModal] = useState(false);
+  const [selectedTaskForLog, setSelectedTaskForLog] = useState(null); // To pass task info to the modal
+  // --- END ADDED State ---
+
+
   // --- Arrays are now USED below ---
   const taskStatuses = ['pending', 'in progress', 'completed'];
   const taskPriorities = ['low', 'medium', 'high'];
@@ -62,8 +71,7 @@ function TaskTable() {
     setError(null);
     try {
       const [tasksResponse, projectsResponse, usersResponse] = await Promise.all([
-        // IMPORTANT: Ensure your API loads project with currency for task list display
-        // e.g., in Laravel: Task::with('project:id,name,currency', ...)->get();
+        // IMPORTANT: Ensure your API loads project.currency AND task.total_time_spent
         fetch(`${API_BASE_URL}/tasks`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }),
         fetch(`${API_BASE_URL}/projects`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }),
         fetch(`${API_BASE_URL}/users`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }),
@@ -77,13 +85,10 @@ function TaskTable() {
       const projectsData = await projectsResponse.json();
       const usersData = await usersResponse.json();
 
-      // Ensure tasksData received has the project relation loaded, including currency
       setTasks(Array.isArray(tasksData) ? tasksData : (tasksData?.data && Array.isArray(tasksData.data) ? tasksData.data : []));
-
       if (projectsData && Array.isArray(projectsData.data)) { setProjects(projectsData.data); }
       else if (Array.isArray(projectsData)) { setProjects(projectsData); }
       else { console.error("API did not return expected projects structure:", projectsData); setProjects([]); setError(prev => prev ? `${prev}\nCould not load projects.` : 'Could not load projects.'); }
-
       setUsers(Array.isArray(usersData) ? usersData : (usersData?.data && Array.isArray(usersData.data) ? usersData.data : []));
 
     } catch (e) {
@@ -113,8 +118,8 @@ function TaskTable() {
             project_id: projects[0]?.id || '',
             title: '',
             description: '',
-            status: 'pending',
-            priority: 'medium',
+            status: 'pending', // Default status
+            priority: 'medium', // Default priority
             assigned_user_id: '',
             due_date: '',
             actual_cost: '',
@@ -234,9 +239,28 @@ function TaskTable() {
     }
   };
 
+  // --- ADDED Time Log Modal Handlers ---
+  const handleShowTimeLogModal = (task) => {
+      setSelectedTaskForLog({ id: task.id, title: task.title }); // Store needed info
+      setShowTimeLogModal(true);
+  };
+
+  const handleCloseTimeLogModal = () => {
+      // Optional: Check if the inner form is submitting before closing
+      setShowTimeLogModal(false);
+      setSelectedTaskForLog(null);
+  };
+
+  const handleTimeLogSaveSuccess = () => {
+      handleCloseTimeLogModal();
+      fetchData(); // Re-fetch tasks to update the total time spent display
+  };
+  // --- END ADDED Handlers ---
+
+
   // --- Render Logic ---
   if (loading) return ( <div className="d-flex justify-content-center align-items-center text-light vh-100"><Spinner animation="border" className="me-2"/> Loading...</div> );
-  if (error && !showModal) return ( <Alert variant="danger" className="bg-dark text-light border-danger">{error}</Alert> );
+  if (error && !showModal && !showTimeLogModal) return ( <Alert variant="danger" className="bg-dark text-light border-danger">{error}</Alert> );
 
   return (
     <div className="p-md-4" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #232323, #1a1a1a)' }}>
@@ -250,7 +274,7 @@ function TaskTable() {
         </div>
 
          {/* Display Errors/Info Messages */}
-         {error && !showModal && <Alert variant="danger" className="bg-dark text-light border-danger">{error}</Alert>}
+         {error && !showModal && !showTimeLogModal && <Alert variant="danger" className="bg-dark text-light border-danger">{error}</Alert>}
          {projects.length === 0 && !loading && <Alert variant="warning" className="bg-dark text-warning border-warning">Create a project before adding tasks.</Alert>}
          {tasks.length === 0 && projects.length > 0 && !loading && <Alert variant="info" className="bg-dark text-info border-info mt-3">No tasks found. Click 'Create New Task' to add one.</Alert>}
 
@@ -268,6 +292,8 @@ function TaskTable() {
                   <th>Assignee</th>
                   {/* ADDED Cost Header */}
                   <th className="text-end">Cost</th>
+                  {/* ADDED Time Header */}
+                  <th className="text-end">Time Spent</th>
                   <th className="text-center">Actions</th>
                 </tr>
               </thead>
@@ -283,13 +309,31 @@ function TaskTable() {
                     {/* ADDED Cost Cell */}
                     <td className="text-end">
                       {task.actual_cost !== null && task.actual_cost > 0
-                        // Format using project's currency, fallback to USD
-                        ? formatCurrency(task.actual_cost, task.project?.currency || 'USD')
-                        : <span className="text-muted">-</span> // Display dash if no cost
+                        ? formatCurrency(task.actual_cost, task.project?.currency || 'PHP')
+                        : <span className="text-muted">-</span>
                       }
                     </td>
-                    {/* END Cost Cell */}
+                    {/* ADDED Time Spent Cell */}
+                    <td className="text-end">
+                      {task.total_time_spent !== null && task.total_time_spent > 0
+                        ? formatDuration(task.total_time_spent) // Use helper function
+                        : <span className="text-muted">0m</span>
+                      }
+                    </td>
+                    {/* Actions Cell */}
                     <td className="text-center">
+                       {/* --- ADDED Log Time Button --- */}
+                       <Button
+                           variant="outline-info"
+                           size="sm"
+                           onClick={() => handleShowTimeLogModal(task)}
+                           className="me-2 py-1 px-2"
+                           title="Log Time Spent on Task"
+                       >
+                          <i className="bi bi-clock-history me-1"></i> Log
+                      </Button>
+                      {/* --- END Log Time Button --- */}
+
                       <Button variant="outline-light" size="sm" onClick={() => handleShowEditModal(task)} className="me-2 py-1 px-2" title="Edit Task Details">
                          <i className="bi bi-pencil-fill me-1"></i> Edit
                        </Button>
@@ -305,7 +349,7 @@ function TaskTable() {
         )}
       </div>
 
-      {/* --- Task Modal --- */}
+      {/* --- Task Edit/Create Modal (Existing - unmodified structure) --- */}
       <Modal show={showModal} onHide={handleCloseModal} backdrop="static" keyboard={false} centered>
         <Modal.Header closeButton={!isSubmitting} closeVariant="white" className="bg-dark border-secondary">
           <Modal.Title className="text-light">{isEditing ? 'Edit Task' : 'Create New Task'}</Modal.Title>
@@ -404,6 +448,21 @@ function TaskTable() {
           </Modal.Footer>
         </Form>
       </Modal>
+      {/* --- End Task Edit/Create Modal --- */}
+
+
+      {/* --- ADDED Time Log Modal Rendering --- */}
+      {selectedTaskForLog && (
+          <TimeLogForm
+              show={showTimeLogModal}
+              handleClose={handleCloseTimeLogModal}
+              taskId={selectedTaskForLog.id}
+              taskTitle={selectedTaskForLog.title}
+              onSaveSuccess={handleTimeLogSaveSuccess} // Pass the callback
+          />
+      )}
+      {/* --- END ADD --- */}
+
     </div>
   );
 }
