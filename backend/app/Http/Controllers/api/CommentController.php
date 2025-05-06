@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use App\Events\CommentAddedToTask;
+
 
 class CommentController extends Controller
 {
@@ -49,12 +49,6 @@ class CommentController extends Controller
                 'body' => $validatedData['body'],
                 'user_id' => $user->id, 
             ]);
-
-            Log::info('[Comment Notify Debug] --- CommentController@store SUCCESS --- Created Comment ID: ' . $comment->id . ' for Task ID: ' . $task->id);
-
-            Log::info('[Comment Notify Debug] Controller attempting dispatch CommentAddedToTask. Comment ID: ' . $comment->id . ', User ID: ' . $user->id);
-
-            event(new CommentAddedToTask($comment, $user));
 
             $comment->load('user:id,name');
 
