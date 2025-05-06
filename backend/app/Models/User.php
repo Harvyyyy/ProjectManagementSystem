@@ -5,19 +5,21 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notifiable; // Correctly imported
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Relations\HasMany; // Optional: Add for type hinting
+use Illuminate\Database\Eloquent\Relations\HasMany; // Import HasMany
+use Illuminate\Database\Eloquent\Relations\BelongsToMany; // Import BelongsToMany
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasApiTokens, Notifiable; // Existing traits are correct
+    // Notifiable trait is correctly included here
+    use HasFactory, HasApiTokens, Notifiable;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string> // Updated docblock type hint
+     * @var array<int, string>
      */
     protected $fillable = [
         'name',
@@ -28,7 +30,7 @@ class User extends Authenticatable
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var array<int, string> // Updated docblock type hint
+     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -44,62 +46,59 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed', // Correct casting for password hashing
+            'password' => 'hashed',
         ];
     }
 
-    // --- Existing Relationships (Keep As Is) ---
+    // --- Relationships ---
 
     /**
      * Get the projects created by the user.
      */
-    public function createdProjects(): HasMany // Optional type hint
+    public function createdProjects(): HasMany // Added return type
     {
         return $this->hasMany(Project::class, 'created_by');
     }
 
     /**
      * Get the tasks assigned to the user.
-     * NOTE: Your provided code used 'assigned_to', ensure your tasks table uses 'assigned_user_id'
-     *       If it's 'assigned_user_id', this relationship should be:
-     *       return $this->hasMany(Task::class, 'assigned_user_id');
+     * IMPORTANT: Verify that 'assigned_user_id' is the correct foreign key name
+     * in your 'tasks' table schema.
      */
-    public function assignedTasks(): HasMany // Optional type hint
+    public function assignedTasks(): HasMany // Added return type
     {
-        // VERIFY this foreign key matches your tasks table schema ('assigned_user_id' is common)
-        return $this->hasMany(Task::class, 'assigned_user_id'); // Assuming 'assigned_user_id' is correct FK
+        // Ensure 'assigned_user_id' matches your database column name for the assignee's ID
+        return $this->hasMany(Task::class, 'assigned_user_id');
     }
 
 
     /**
      * Get the tasks created by the user.
      */
-    public function createdTasks(): HasMany // Optional type hint
+    public function createdTasks(): HasMany // Added return type
     {
         // Assuming 'created_by' in tasks table links to user id
         return $this->hasMany(Task::class, 'created_by');
     }
 
     /**
-     * The projects that the user is a member of (if using pivot table).
-     * If this isn't used or set up differently, it might need adjustment or removal.
+     * The projects that the user is a member of.
+     * Assumes a pivot table named 'project_user'.
      */
-    public function projects() // Needs return type hint like BelongsToMany if used
+    public function projects(): BelongsToMany // Added return type
     {
-        // Assuming a pivot table like 'project_user' exists
-        return $this->belongsToMany(Project::class); // Add pivot table name if non-standard
+        // Specify pivot table name and keys if they differ from Laravel conventions
+        return $this->belongsToMany(Project::class);
     }
 
-
-    // --- NEW RELATIONSHIP for Time Tracking ---
 
     /**
-     * Get all the time entries recorded by the user.
+     * Get all the comments made by the user.
      */
-    public function timeEntries(): HasMany // Optional type hint
-    {
-        // Assumes 'user_id' foreign key exists on the 'time_entries' table
-        return $this->hasMany(TimeEntry::class);
-    }
-    // --- END NEW RELATIONSHIP ---
+     public function comments(): HasMany // Added return type
+     {
+         // Assumes a 'user_id' foreign key on the comments table
+         return $this->hasMany(Comment::class);
+     }
+
 }

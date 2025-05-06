@@ -4,60 +4,43 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Casts\Attribute; // Import if using new accessor syntax
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Task extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'project_id',
-        'title',
-        'description',
-        'status',
-        'priority',
-        'assigned_user_id',
-        'created_by',
-        'due_date',
-        'actual_cost',
+        'project_id', 'title', 'description', 'status', 'priority',
+        'assigned_user_id', 'created_by', 'due_date',
+        // 'started_at', // REMOVED
+        // 'ended_at',   // REMOVED
+         'completed_at', // Keep in fillable IF you might ever set it directly (unlikely with this flow)
     ];
 
     protected $casts = [
         'due_date' => 'date',
-        'actual_cost' => 'decimal:2',
+        // 'started_at' => 'datetime', // REMOVED
+        // 'ended_at' => 'datetime',   // REMOVED
+        'completed_at' => 'datetime', // <-- ADDED
     ];
-
-    // --- NEW: Relationship to Time Entries ---
-    public function timeEntries()
-    {
-        return $this->hasMany(TimeEntry::class);
-    }
-    // --- END NEW ---
-
 
     // --- Relationships ---
-    // ... (owner, project, assignedUser relationships remain) ...
-    public function owner() { return $this->belongsTo(User::class, 'created_by'); }
-    public function project() { return $this->belongsTo(Project::class); }
-    public function assignedUser() { return $this->belongsTo(User::class, 'assigned_user_id'); }
+    public function owner(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function project(): BelongsTo { return $this->belongsTo(Project::class, 'project_id'); }
+    public function assignedUser(): BelongsTo { return $this->belongsTo(User::class, 'assigned_user_id'); }
 
+    // --- REMOVED Duration Accessor & Append ---
+    // protected function duration(): Attribute { ... }
+    // protected $appends = [ /* remove 'duration' */ ];
+    protected $appends = []; // Clear appends if duration was the only one
 
-    // --- NEW: Accessor for Total Time Spent ---
-    /**
-     * Calculate total time spent on this task in minutes.
-     */
-    public function getTotalTimeSpentAttribute(): int
+    public function comments(): HasMany
     {
-        // Sum the 'duration' from related time entries
-        return (int) $this->timeEntries()->sum('duration');
+        // Order by oldest first, or 'latest()' for newest first
+        return $this->hasMany(Comment::class)->orderBy('created_at', 'asc');
     }
-    // --- END NEW ---
-
-
-    // --- UPDATE: Append the new accessor ---
-    protected $appends = [
-        'total_time_spent' // Add this
-    ];
-    // --- END UPDATE ---
-
 }

@@ -8,7 +8,7 @@
 export const formatCurrency = (amount, currencyCode = 'PHP', locale = 'en-US') => { // Defaulting to PHP based on previous code
   const numericAmount = parseFloat(amount);
   if (amount === null || amount === undefined || isNaN(numericAmount)) {
-      return ''; // Or return a placeholder like 'N/A' or '-'
+      return ''; 
   }
 
   try {
@@ -20,7 +20,6 @@ export const formatCurrency = (amount, currencyCode = 'PHP', locale = 'en-US') =
       }).format(numericAmount);
   } catch (error) {
       console.error("Currency formatting error:", error);
-      // Fallback for invalid currency code
       return `${numericAmount.toFixed(2)} ${currencyCode}`;
   }
 };
@@ -36,7 +35,6 @@ export const formatDate = (dateInput, options = { year: 'numeric', month: 'short
   if (!dateInput) return 'N/A';
   try {
       const date = new Date(dateInput);
-      // Check if date is valid after parsing
       if (isNaN(date.getTime())) {
            return 'Invalid Date';
       }
@@ -68,10 +66,8 @@ if (hours > 0) {
   result += `${hours}h`;
 }
 if (minutes > 0) {
-  result += `${hours > 0 ? ' ' : ''}${minutes}m`; // Add space if hours exist
+  result += `${hours > 0 ? ' ' : ''}${minutes}m`;
 }
 
-return result || '0m'; // Fallback just in case
+return result || '0m';
 };
-
-// Add any other utility functions you might have here...
