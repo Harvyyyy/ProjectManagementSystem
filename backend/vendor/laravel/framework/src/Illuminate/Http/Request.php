@@ -7,11 +7,8 @@ use Closure;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Session\SymfonySessionDecorator;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Illuminate\Support\Traits\Conditionable;
 use Illuminate\Support\Traits\Macroable;
-use Illuminate\Support\Uri;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\HttpFoundation\InputBag;
@@ -29,7 +26,6 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
         Concerns\InteractsWithContentTypes,
         Concerns\InteractsWithFlashData,
         Concerns\InteractsWithInput,
-        Conditionable,
         Macroable;
 
     /**
@@ -90,16 +86,6 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
     public function method()
     {
         return $this->getMethod();
-    }
-
-    /**
-     * Get a URI instance for the request.
-     *
-     * @return \Illuminate\Support\Uri
-     */
-    public function uri()
-    {
-        return Uri::of($this->fullUrl());
     }
 
     /**
@@ -224,8 +210,9 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      */
     public function is(...$patterns)
     {
-        return (new Collection($patterns))
-            ->contains(fn ($pattern) => Str::is($pattern, $this->decodedPath()));
+        $path = $this->decodedPath();
+
+        return collect($patterns)->contains(fn ($pattern) => Str::is($pattern, $path));
     }
 
     /**
@@ -247,8 +234,9 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      */
     public function fullUrlIs(...$patterns)
     {
-        return (new Collection($patterns))
-            ->contains(fn ($pattern) => Str::is($pattern, $this->fullUrl()));
+        $url = $this->fullUrl();
+
+        return collect($patterns)->contains(fn ($pattern) => Str::is($pattern, $url));
     }
 
     /**
@@ -361,13 +349,9 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      */
     public function merge(array $input)
     {
-        return tap($this, function (Request $request) use ($input) {
-            $request->getInputSource()
-                ->replace((new Collection($input))->reduce(
-                    fn ($requestInput, $value, $key) => data_set($requestInput, $key, $value),
-                    $this->getInputSource()->all()
-                ));
-        });
+        $this->getInputSource()->add($input);
+
+        return $this;
     }
 
     /**
@@ -378,14 +362,13 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      */
     public function mergeIfMissing(array $input)
     {
-        return $this->merge((new Collection($input))
-            ->filter(fn ($value, $key) => $this->missing($key))
-            ->toArray()
-        );
+        return $this->merge(collect($input)->filter(function ($value, $key) {
+            return $this->missing($key);
+        })->toArray());
     }
 
     /**
-     * Replace the input values for the current request.
+     * Replace the input for the current request.
      *
      * @param  array  $input
      * @return $this
@@ -406,7 +389,6 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      * @param  mixed  $default
      * @return mixed
      */
-    #[\Override]
     public function get(string $key, mixed $default = null): mixed
     {
         return parent::get($key, $default);
@@ -517,7 +499,6 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      *
      * @return static
      */
-    #[\Override]
     public function duplicate(?array $query = null, ?array $request = null, ?array $attributes = null, ?array $cookies = null, ?array $files = null, ?array $server = null): static
     {
         return parent::duplicate($query, $request, $attributes, $cookies, $this->filterFiles($files), $server);
@@ -551,21 +532,19 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\Override]
     public function hasSession(bool $skipIfUninitialized = false): bool
     {
-        return $this->session instanceof SymfonySessionDecorator;
+        return ! is_null($this->session);
     }
 
     /**
      * {@inheritdoc}
      */
-    #[\Override]
     public function getSession(): SessionInterface
     {
         return $this->hasSession()
-            ? $this->session
-            : throw new SessionNotFoundException;
+                    ? new SymfonySessionDecorator($this->session())
+                    : throw new SessionNotFoundException;
     }
 
     /**
@@ -581,7 +560,7 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
             throw new RuntimeException('Session store not set on request.');
         }
 
-        return $this->session->store;
+        return $this->session;
     }
 
     /**
@@ -592,7 +571,7 @@ class Request extends SymfonyRequest implements Arrayable, ArrayAccess
      */
     public function setLaravelSession($session)
     {
-        $this->session = new SymfonySessionDecorator($session);
+        $this->session = $session;
     }
 
     /**
