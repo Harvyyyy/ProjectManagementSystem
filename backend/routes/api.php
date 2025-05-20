@@ -1,59 +1,73 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\api\ProjectController;
-use App\Http\Controllers\api\TaskController;
-use App\Http\Controllers\api\AuthController;
-use App\Http\Controllers\api\UserController;
-use App\Http\Controllers\api\ExpenditureController;
-use App\Http\Controllers\api\CommentController;
-// TimeEntryController is not used
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TaskFileController;
+use App\Http\Controllers\RiskIssueController;
+use App\Http\Controllers\TaskCommentController;
+use App\Http\Controllers\ProjectMemberController;
+use App\Http\Controllers\ProjectExpenditureController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
-// Authenticated Routes (Require Sanctum Token)
 Route::middleware('auth:sanctum')->group(function () {
+    // Authenticated user profile
+    Route::get('/user', function (\Illuminate\Http\Request $request) {
+        return $request->user();
+    });
 
-    // === Project Routes ===
+    // Project routes
     Route::apiResource('projects', ProjectController::class);
 
-    // === Expenditure Routes (Using shallow) ===
-    Route::apiResource('projects.expenditures', ExpenditureController::class)
-         ->shallow();
-
-    // === Task Routes ===
-    Route::get('projects/{project}/tasks', [TaskController::class, 'projectTasks']);
-    Route::get('tasks/status/{status}', [TaskController::class, 'tasksByStatus']);
-
-    // --- Task Completion Routes ---
-    // Mark as Complete
-    Route::post('tasks/{task}/complete', [TaskController::class, 'markAsComplete'])->name('tasks.complete');
-    // Undo Completion
-    Route::post('tasks/{task}/undo-complete', [TaskController::class, 'undoComplete'])->name('tasks.undoComplete');
-    // --- END Completion Routes ---
-
-    // Standard Task CRUD (index, show, store, update, destroy)
-    // Note: store sets default 'pending' status, update allows status change
+    // Task routes
     Route::apiResource('tasks', TaskController::class);
+    Route::get('projects/{project}/tasks', [TaskController::class, 'getProjectTasks']);
 
-    // === User Routes ===
-    Route::get('/users', [UserController::class, 'index']); // List users
+    // Task Comments routes
+    Route::get('/tasks/{task}/comments', [TaskCommentController::class, 'index']);
+    Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store']);
 
-    // === Auth Routes ===
-    Route::post('/logout', [AuthController::class, 'logout']);
+    // Task Files routes
+    Route::get('/tasks/{task}/files', [TaskFileController::class, 'index']);
+    Route::post('/tasks/{task}/files', [TaskFileController::class, 'store']);
+    Route::get('/files/{file}/download', [TaskFileController::class, 'download']);
+    Route::delete('/files/{file}', [TaskFileController::class, 'destroy']);
 
-    Route::apiResource('tasks.comments', CommentController::class)->only(['index', 'store']);
+    // Project Members routes
+    Route::get('projects/{project}/members', [ProjectMemberController::class, 'index']);
+    Route::post('projects/{project}/members', [ProjectMemberController::class, 'store']);
+    Route::delete('projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy']);
+
+    // Activity Log routes
+    Route::get('/notifications', function () {
+        return \App\Models\ActivityLog::where('user_id', auth()->id())
+            ->with('user:id,name')
+            ->latest()
+            ->limit(20)
+            ->get();
+    });
+
+
+    // Get all users (used for system-wide purposes if needed)
+    Route::get('/users', function () {
+        return response()->json(['users' => User::all()]);
+    });
+    // Expenditure routes
+    Route::get('/projects/{project}/expenditures', [ProjectExpenditureController::class, 'index']);
+    Route::post('/projects/{project}/expenditures', [ProjectExpenditureController::class, 'store']);
+    Route::delete('/expenditures/{id}', [ProjectExpenditureController::class, 'destroy']);
+
+    // Risk & Issue routes
+    Route::get('/projects/{project}/risks-issues', [RiskIssueController::class, 'index']);
+    Route::post('/projects/{project}/risks-issues', [RiskIssueController::class, 'store']);
+    Route::get('/risks-issues/{riskIssue}', [RiskIssueController::class, 'show']);
+    Route::put('/risks-issues/{riskIssue}', [RiskIssueController::class, 'update']);
+    Route::delete('/risks-issues/{riskIssue}', [RiskIssueController::class, 'destroy']);
+
 
 });
-
-// Public Routes (No Authentication Required)
-Route::prefix('auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-});
-
-// Ensure no duplicate unauthenticated resource routes exist below

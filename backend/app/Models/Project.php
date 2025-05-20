@@ -4,135 +4,56 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Casts\Attribute; // Keep this import
-use Illuminate\Database\Eloquent\Relations\HasMany; // Optional: Type hints
-use Illuminate\Database\Eloquent\Relations\BelongsTo; // Optional: Type hints
 
 class Project extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'name', // Ensure name is fillable
+        'name',
         'description',
-        'start_date',
-        'end_date',
-        'status',
-        'created_by',
         'budget',
-        'currency'
+        'start_date',
+        'due_date',
+        'status',
+        'user_id'
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'start_date' => 'date',
-        'end_date' => 'date',
-        'budget' => 'decimal:2', // Cast budget to handle currency correctly
-        // Timestamps (created_at, updated_at) are automatically handled as datetimes
+        'due_date' => 'date',
+        'budget' => 'decimal:2',
     ];
 
-    // --- Relationships ---
-
-    /**
-     * Get the user who created the project.
-     */
-    public function owner(): BelongsTo
+    public function user()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the tasks associated with the project.
-     */
-    public function tasks(): HasMany
+    public function tasks()
     {
         return $this->hasMany(Task::class);
     }
 
-    /**
-     * Get the expenditures associated with the project.
-     */
-    public function expenditures(): HasMany
+    public function members()
     {
-        return $this->hasMany(Expenditure::class);
+        return $this->belongsToMany(User::class);
     }
 
-    // --- Accessors ---
-
-    /**
-     * Accessor: Calculate the total expenditure amount for the project.
-     */
-    protected function totalExpenditure(): Attribute
+    public function expenditures()
     {
-        return Attribute::make(
-            // Sum the 'amount' from related expenditures
-            get: fn () => (float) $this->expenditures()->sum('amount'),
-        );
+        return $this->hasMany(ProjectExpenditure::class);
     }
 
-    /**
-     * Accessor: Calculate the remaining budget based on EXPENDITURES.
-     * Returns null if the project budget is null.
-     */
-    protected function remainingBudget(): Attribute
+    public function getRemainingBudgetAttribute()
     {
-        return Attribute::make(
-            get: function () {
-                if ($this->budget === null) {
-                    return null; // No budget means remaining is undefined
-                }
-                // Use the totalExpenditure accessor defined above
-                return (float) ($this->budget - $this->totalExpenditure);
-            }
-        );
+        return $this->budget - $this->expenditures->sum('amount');
     }
 
-    /**
-     * Accessor: Calculate the progress percentage based on completed tasks.
-     */
-    protected function progressPercentage(): Attribute // Method name matches appended property
+    public function riskIssues()
     {
-        return Attribute::make(
-            get: function ($value) { // $value is the original db column value (null here)
-                // Eager load counts for efficiency if accessing this for many projects
-                // $this->loadCount(['tasks', 'completedTasks' => function ($query) {
-                //    $query->where('status', 'completed');
-                // }]);
-                // $totalTasks = $this->tasks_count;
-                // $completedTasks = $this->completed_tasks_count;
-
-                // Simpler version (less efficient for lists, fine for single model)
-                $totalTasks = $this->tasks()->count(); // Count all tasks for this project
-
-                if ($totalTasks === 0) {
-                    return 0; // No tasks means 0% progress
-                }
-                $completedTasks = $this->tasks()->where('status', 'completed')->count();
-
-                // Calculate percentage, round to nearest integer
-                return (int) round(($completedTasks / $totalTasks) * 100);
-            }
-        );
+        return $this->hasMany(RiskIssue::class);
     }
 
-    // --- Appends ---
-    /**
-     * The accessors to append to the model's array form.
-     *
-     * @var array<int, string>
-     */
-    protected $appends = [
-        'total_expenditure',    // For budget tracking based on expenditures
-        'remaining_budget',     // Calculated based on total_expenditure
-        'progress_percentage'   // <-- ADDED for progress tracking
-    ];
+
 }
