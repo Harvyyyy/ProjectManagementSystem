@@ -6,7 +6,6 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection as BaseCollection;
 
 class BroadcastableModelEventOccurred implements ShouldBroadcast
 {
@@ -75,12 +74,12 @@ class BroadcastableModelEventOccurred implements ShouldBroadcast
     public function broadcastOn()
     {
         $channels = empty($this->channels)
-            ? ($this->model->broadcastOn($this->event) ?: [])
-            : $this->channels;
+                ? ($this->model->broadcastOn($this->event) ?: [])
+                : $this->channels;
 
-        return (new BaseCollection($channels))
-            ->map(fn ($channel) => $channel instanceof Model ? new PrivateChannel($channel) : $channel)
-            ->all();
+        return collect($channels)->map(function ($channel) {
+            return $channel instanceof Model ? new PrivateChannel($channel) : $channel;
+        })->all();
     }
 
     /**
@@ -93,8 +92,8 @@ class BroadcastableModelEventOccurred implements ShouldBroadcast
         $default = class_basename($this->model).ucfirst($this->event);
 
         return method_exists($this->model, 'broadcastAs')
-            ? ($this->model->broadcastAs($this->event) ?: $default)
-            : $default;
+                ? ($this->model->broadcastAs($this->event) ?: $default)
+                : $default;
     }
 
     /**

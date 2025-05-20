@@ -31,6 +31,21 @@ class PostgresProcessor extends Processor
     }
 
     /**
+     * Process the results of a column listing query.
+     *
+     * @deprecated Will be removed in a future Laravel version.
+     *
+     * @param  array  $results
+     * @return array
+     */
+    public function processColumnListing($results)
+    {
+        return array_map(function ($result) {
+            return ((object) $result)->column_name;
+        }, $results);
+    }
+
+    /**
      * Process the results of a types query.
      *
      * @param  array  $results
@@ -44,7 +59,6 @@ class PostgresProcessor extends Processor
             return [
                 'name' => $result->name,
                 'schema' => $result->schema,
-                'schema_qualified_name' => $result->schema.'.'.$result->name,
                 'implicit' => (bool) $result->implicit,
                 'type' => match (strtolower($result->type)) {
                     'b' => 'base',
@@ -98,16 +112,9 @@ class PostgresProcessor extends Processor
                 'type' => $result->type,
                 'collation' => $result->collation,
                 'nullable' => (bool) $result->nullable,
-                'default' => $result->generated ? null : $result->default,
+                'default' => $autoincrement ? null : $result->default,
                 'auto_increment' => $autoincrement,
                 'comment' => $result->comment,
-                'generation' => $result->generated ? [
-                    'type' => match ($result->generated) {
-                        's' => 'stored',
-                        default => null,
-                    },
-                    'expression' => $result->default,
-                ] : null,
             ];
         }, $results);
     }
@@ -125,7 +132,7 @@ class PostgresProcessor extends Processor
 
             return [
                 'name' => strtolower($result->name),
-                'columns' => $result->columns ? explode(',', $result->columns) : [],
+                'columns' => explode(',', $result->columns),
                 'type' => strtolower($result->type),
                 'unique' => (bool) $result->unique,
                 'primary' => (bool) $result->primary,

@@ -5,7 +5,6 @@ namespace Illuminate\Database\Query\Grammars;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinLateralClause;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class SqlServerGrammar extends Grammar
@@ -114,8 +113,8 @@ class SqlServerGrammar extends Grammar
     protected function compileIndexHint(Builder $query, $indexHint)
     {
         return $indexHint->type === 'force'
-            ? "with (index({$indexHint->index}))"
-            : '';
+                    ? "with (index({$indexHint->index}))"
+                    : '';
     }
 
     /**
@@ -281,8 +280,8 @@ class SqlServerGrammar extends Grammar
         $sql = parent::compileDeleteWithoutJoins($query, $table, $where);
 
         return ! is_null($query->limit) && $query->limit > 0 && $query->offset <= 0
-            ? Str::replaceFirst('delete', 'delete top ('.$query->limit.')', $sql)
-            : $sql;
+                        ? Str::replaceFirst('delete', 'delete top ('.$query->limit.')', $sql)
+                        : $sql;
     }
 
     /**
@@ -312,22 +311,6 @@ class SqlServerGrammar extends Grammar
         }
 
         return '';
-    }
-
-    /**
-     * Compile a row number clause.
-     *
-     * @param  string  $partition
-     * @param  string  $orders
-     * @return string
-     */
-    protected function compileRowNumber($partition, $orders)
-    {
-        if (empty($orders)) {
-            $orders = 'order by (select 0)';
-        }
-
-        return parent::compileRowNumber($partition, $orders);
     }
 
     /**
@@ -419,20 +402,20 @@ class SqlServerGrammar extends Grammar
 
         $sql = 'merge '.$this->wrapTable($query->from).' ';
 
-        $parameters = (new Collection($values))->map(function ($record) {
+        $parameters = collect($values)->map(function ($record) {
             return '('.$this->parameterize($record).')';
         })->implode(', ');
 
         $sql .= 'using (values '.$parameters.') '.$this->wrapTable('laravel_source').' ('.$columns.') ';
 
-        $on = (new Collection($uniqueBy))->map(function ($column) use ($query) {
+        $on = collect($uniqueBy)->map(function ($column) use ($query) {
             return $this->wrap('laravel_source.'.$column).' = '.$this->wrap($query->from.'.'.$column);
         })->implode(' and ');
 
         $sql .= 'on '.$on.' ';
 
         if ($update) {
-            $update = (new Collection($update))->map(function ($value, $key) {
+            $update = collect($update)->map(function ($value, $key) {
                 return is_numeric($key)
                     ? $this->wrap($value).' = '.$this->wrap('laravel_source.'.$value)
                     : $this->wrap($key).' = '.$this->parameter($value);
@@ -499,16 +482,6 @@ class SqlServerGrammar extends Grammar
     }
 
     /**
-     * Compile a query to get the number of open connections for a database.
-     *
-     * @return string
-     */
-    public function compileThreadCount()
-    {
-        return 'select count(*) Value from sys.dm_exec_sessions where status = N\'running\'';
-    }
-
-    /**
      * Get the format for database stored dates.
      *
      * @return string
@@ -557,13 +530,12 @@ class SqlServerGrammar extends Grammar
      * Wrap a table in keyword identifiers.
      *
      * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
-     * @param  string|null  $prefix
      * @return string
      */
-    public function wrapTable($table, $prefix = null)
+    public function wrapTable($table)
     {
         if (! $this->isExpression($table)) {
-            return $this->wrapTableValuedFunction(parent::wrapTable($table, $prefix));
+            return $this->wrapTableValuedFunction(parent::wrapTable($table));
         }
 
         return $this->getValue($table);
